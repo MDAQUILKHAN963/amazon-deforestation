@@ -1,0 +1,16 @@
+# Core DL stack (Colab ships torch/torchvision; pin loosely for local installs)
+torch
+torchvision
+segmentation-models-pytorch
+
+# Geospatial I/O
+rioxarray
+xarray
+netCDF4
+
+# Data / augmentation / metrics / utils
+numpy
+albumentations
+scikit-learn
+matplotlib
+tqdm
