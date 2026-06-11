@@ -57,7 +57,8 @@ def train(smoke=False):
     steps = max(1, len(train_loader) // C.GRAD_ACCUM) * epochs
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=steps)
     loss_fn = torch.nn.BCEWithLogitsLoss()
-    scaler = torch.cuda.amp.GradScaler(enabled=C.USE_AMP)
+    amp_enabled = C.USE_AMP and device == "cuda"        # AMP only helps on GPU
+    scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
     C.OUTPUTS.mkdir(parents=True, exist_ok=True)
     best_iou = -1.0
@@ -72,7 +73,7 @@ def train(smoke=False):
             opt.zero_grad(set_to_none=True)
             for it, (x, y) in enumerate(train_loader):
                 x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
-                with torch.autocast(device_type=device.split(":")[0], enabled=C.USE_AMP):
+                with torch.autocast(device_type=device.split(":")[0], enabled=amp_enabled):
                     logits = model(x)
                     loss = loss_fn(logits, y) / C.GRAD_ACCUM
                 scaler.scale(loss).backward()

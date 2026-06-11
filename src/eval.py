@@ -44,9 +44,10 @@ def evaluate(model, loader, device, thresh=C.THRESHOLD):
     """Full-pass evaluation; returns the metrics dict."""
     model.eval()
     total = np.zeros(4)
+    amp_enabled = C.USE_AMP and device.split(":")[0] == "cuda"
     for x, y in loader:
         x, y = x.to(device), y.to(device)
-        with torch.autocast(device_type=device.split(":")[0], enabled=C.USE_AMP):
+        with torch.autocast(device_type=device.split(":")[0], enabled=amp_enabled):
             logits = model(x)
         total += confusion_counts(logits.float(), y, thresh)
     return metrics_from_counts(total)
