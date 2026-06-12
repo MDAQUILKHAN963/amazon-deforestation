@@ -110,7 +110,7 @@ if __name__ == "__main__":
     model = build_model().to(device)
     ckpt = C.OUTPUTS / "best.pt"
     if ckpt.exists():
-        model.load_state_dict(torch.load(ckpt, map_location=device)["model"])
+        model.load_state_dict(torch.load(ckpt, map_location=device, weights_only=False)["model"])
         print("loaded", ckpt)
     else:
         print("WARNING: no checkpoint at", ckpt, "- evaluating random weights")
