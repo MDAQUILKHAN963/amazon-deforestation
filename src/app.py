@@ -52,7 +52,8 @@ def analyze(lat, lon, year):
       </div>
       <div style="margin-top:12px;color:#666;font-size:13px;">
         Nearest tile: ({rows[idx]['lat']}, {rows[idx]['lon']}) ·
-        {rows[idx]['mask_date'][:7]} · ~{km*111:.1f} km from your point
+        {rows[idx]['mask_date'][:7]} · ~{km*111:.1f} km from your point ·
+        cloud {rows[idx]['cloud_frac']*100:.0f}%
       </div>
     </div>"""
 
@@ -70,7 +71,12 @@ def analyze(lat, lon, year):
 
 
 def random_location():
-    i = int(np.random.randint(len(rows)))
+    # pick a clear tile that actually has some deforestation -> a meaningful demo
+    good = [i for i in range(len(rows))
+            if rows[i]["cloud_frac"] <= 0.35 and rows[i]["pos_frac"] > 0.05]
+    if not good:
+        good = list(range(len(rows)))
+    i = int(np.random.choice(good))
     return rows[i]["lat"], rows[i]["lon"]
 
 
@@ -117,7 +123,7 @@ with gr.Blocks(title="Amazon Deforestation Detector", theme=THEME, css=CSS) as a
                 "study region (2019–2021).</small>")
         with gr.Column(scale=3, min_width=420):
             verdict = gr.HTML()
-            picture = gr.Plot(label="Satellite · Actual · Prediction")
+            picture = gr.Plot(show_label=False)
 
     go.click(analyze, [lat, lon, year], [verdict, picture])
     rnd.click(random_location, None, [lat, lon])

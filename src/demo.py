@@ -46,15 +46,19 @@ def _load(proc_dir=C.DATA_PROC, ckpt=None):
     return X, Y, rows, mean, std, model, device
 
 
-def find_tile(rows, lat, lon, year=None):
-    """Return the index of the tile nearest to (lat, lon), optionally matching a year."""
-    cand = range(len(rows))
+def find_tile(rows, lat, lon, year=None, max_cloud=0.35):
+    """Index of the CLEAR tile nearest to (lat, lon), optionally matching a year.
+
+    Cloudy tiles (white, washed-out optical) confuse the model, so we only consider
+    tiles with low cloud cover — the same kind the model was trained/validated on.
+    """
+    cand = [i for i in range(len(rows)) if rows[i]["cloud_frac"] <= max_cloud]
     if year is not None:
-        cand = [i for i in cand if rows[i]["mask_date"].startswith(str(year))]
-        if not cand:
-            print(f"(no tile for year {year}; ignoring year)")
-            cand = range(len(rows))
-    d2 = [( (rows[i]["lat"]-lat)**2 + (rows[i]["lon"]-lon)**2, i) for i in cand]
+        yc = [i for i in cand if rows[i]["mask_date"].startswith(str(year))]
+        cand = yc or cand
+    if not cand:                                    # fallback: ignore cloud filter
+        cand = list(range(len(rows)))
+    d2 = [((rows[i]["lat"]-lat)**2 + (rows[i]["lon"]-lon)**2, i) for i in cand]
     dist, i = min(d2)
     return i, dist ** 0.5
 
