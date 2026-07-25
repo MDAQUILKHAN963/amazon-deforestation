@@ -13,3 +13,6 @@ __pycache__/
 *.pyc
 .venv/
 .ipynb_checkpoints/
+
+# Presentation files (not code)
+*.pptx
