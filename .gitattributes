@@ -1,0 +1,16 @@
+# Normalize line endings: LF in the repo, native in the working copy.
+# Without this, editing on Windows and running on Colab produces spurious diffs.
+* text=auto
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.cfg   text eol=lf
+*.yml   text eol=lf
+
+# Binary — never munge these
+*.pptx  binary
+*.npy   binary
+*.nc    binary
+*.pt    binary
+*.png   binary
