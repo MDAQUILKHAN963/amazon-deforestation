@@ -1,0 +1,40 @@
+DEFORESTATION DETECTOR — TEST COORDINATES
+=========================================
+The app has two regions. Enter a coordinate INSIDE one of these boxes.
+
+
+HASDEO (INDIA)   — use POSITIVE numbers
+------------------------------------------------------
+  Latitude  : 22.30  to  23.00   (North)
+  Longitude : 82.40  to  82.90   (East)
+  Location  : Chhattisgarh, India (Korba / Hasdeo coalfield)
+
+  Try these (Region = Hasdeo (India), Year = 2023):
+    Deforestation:  lat 22.341, lon 82.607
+    Deforestation:  lat 22.688, lon 82.579
+    Forest (clear): lat 22.450, lon 82.700
+
+
+AMAZON (BRAZIL)  — use NEGATIVE numbers
+------------------------------------------------------
+  Latitude  : -4.39  to  -3.33   (South)
+  Longitude : -55.20 to  -54.48  (West)
+  Location  : Brazilian Amazon, Para state (near the Tapajos river)
+
+  Try this (Region = Amazon (Brazil), Year = 2021):
+    lat -4.05, lon -54.90
+
+
+HOW TO TEST
+------------------------------------------------------
+1. Pick the Region in the dropdown.
+2. Enter a Latitude and Longitude from that region's range above.
+3. Choose a Year and click "Analyze".
+4. You will see: Satellite image | Actual deforestation | Model prediction.
+   Red = deforested area.
+
+TIP: Test one deforestation spot AND one forest spot — this shows the
+model actually tells them apart, not just predicts "red" everywhere.
+
+NOTE: Outside these two boxes the model was not trained, so results
+there are not reliable.
