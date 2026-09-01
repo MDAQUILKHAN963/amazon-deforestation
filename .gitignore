@@ -16,3 +16,18 @@ __pycache__/
 
 # Presentation files (not code)
 *.pptx
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Packaging / test caches
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Local secrets (GEE service-account keys, API tokens)
+.env
+*.pem
+service-account*.json
