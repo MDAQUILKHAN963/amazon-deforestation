@@ -27,15 +27,17 @@ import config as C
 from dataset import build_datasets
 from model import build_model
 from eval import evaluate, confusion_counts, metrics_from_counts, results_table
+from utils import set_seed, seed_worker
 
 
 def make_optimizer(model):
     return torch.optim.AdamW(model.parameters(), lr=C.LR, weight_decay=1e-4)
 
 
-def train(smoke=False):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device: {device}")
+def train(smoke=False, seed=C.SEED):
+    set_seed(seed)
+    device = C.get_device()
+    print(f"device: {device} | seed: {seed}")
 
     train_ds, val_ds = build_datasets()
     epochs = C.EPOCHS
@@ -48,7 +50,8 @@ def train(smoke=False):
         print(f"SMOKE TEST: 1 epoch, {len(train_ds)} train / {len(val_ds)} val samples")
 
     train_loader = DataLoader(train_ds, batch_size=batch, shuffle=True,
-                              num_workers=C.NUM_WORKERS, drop_last=True, pin_memory=True)
+                              num_workers=C.NUM_WORKERS, drop_last=True, pin_memory=True,
+                              worker_init_fn=seed_worker)
     val_loader = DataLoader(val_ds, batch_size=batch, shuffle=False,
                             num_workers=C.NUM_WORKERS, pin_memory=True)
 
@@ -57,7 +60,7 @@ def train(smoke=False):
     steps = max(1, len(train_loader) // C.GRAD_ACCUM) * epochs
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=steps)
     loss_fn = torch.nn.BCEWithLogitsLoss()
-    amp_enabled = C.USE_AMP and device == "cuda"        # AMP only helps on GPU
+    amp_enabled = C.USE_AMP and device.split(":")[0] == "cuda"   # AMP is CUDA-only (not MPS)
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
     C.OUTPUTS.mkdir(parents=True, exist_ok=True)
@@ -119,5 +122,6 @@ def train(smoke=False):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true", help="1 epoch on 20 samples (pipeline test)")
+    ap.add_argument("--seed", type=int, default=C.SEED, help=f"random seed (default {C.SEED})")
     args = ap.parse_args()
-    train(smoke=args.smoke)
+    train(smoke=args.smoke, seed=args.seed)
