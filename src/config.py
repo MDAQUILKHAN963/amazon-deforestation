@@ -50,6 +50,27 @@ SEED          = 42
 # channel groups (indices into CHANNEL_ORDER [B2,B3,B4,B8,VV,VH]) for input dropout
 CHANNEL_GROUPS = {"optical": [0, 1, 2, 3], "sar": [4, 5]}
 
+# --- device --------------------------------------------------------------
+# Set DEFOR_DEVICE to force a backend (e.g. "cpu" to debug a CUDA-only crash);
+# otherwise pick the best available: CUDA (Colab) > MPS (Apple) > CPU.
+DEVICE_OVERRIDE = os.environ.get("DEFOR_DEVICE")
+
+
+def get_device() -> str:
+    """Resolve the training/eval device once, honouring DEFOR_DEVICE."""
+    if DEVICE_OVERRIDE:
+        return DEVICE_OVERRIDE
+    try:
+        import torch
+    except ImportError:
+        return "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 # --- eval ----------------------------------------------------------------
 THRESHOLD     = 0.5        # logit->mask threshold for metrics
 
