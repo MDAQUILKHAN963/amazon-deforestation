@@ -12,6 +12,7 @@ Features required by the plan:
 Usage (on Colab, with DEFOR_DATA pointing at /content/processed):
     python train.py --smoke         # CHECKPOINT 4: tiny end-to-end test
     python train.py                 # full run
+    python train.py --epochs 30 --batch-size 4 --lr 1e-4   # sweep without editing config
 """
 from __future__ import annotations
 
@@ -30,18 +31,21 @@ from eval import evaluate, confusion_counts, metrics_from_counts, results_table
 from utils import set_seed, seed_worker
 
 
-def make_optimizer(model):
-    return torch.optim.AdamW(model.parameters(), lr=C.LR, weight_decay=1e-4)
+def make_optimizer(model, lr=None):
+    return torch.optim.AdamW(model.parameters(), lr=lr or C.LR, weight_decay=1e-4)
 
 
-def train(smoke=False, seed=C.SEED):
+def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None):
+    """Train the U-Net. Any of epochs/batch_size/lr left as None falls back to config."""
     set_seed(seed)
     device = C.get_device()
     print(f"device: {device} | seed: {seed}")
 
     train_ds, val_ds = build_datasets()
-    epochs = C.EPOCHS
-    batch = C.BATCH_SIZE
+    epochs = epochs or C.EPOCHS
+    batch = batch_size or C.BATCH_SIZE
+    lr = lr or C.LR
+    print(f"epochs: {epochs} | batch: {batch} | lr: {lr:g}")
 
     if smoke:                                   # CHECKPOINT 4: tiny, fast sanity run
         epochs = 1
@@ -56,7 +60,7 @@ def train(smoke=False, seed=C.SEED):
                             num_workers=C.NUM_WORKERS, pin_memory=True)
 
     model = build_model().to(device)
-    opt = make_optimizer(model)
+    opt = make_optimizer(model, lr=lr)
     steps = max(1, len(train_loader) // C.GRAD_ACCUM) * epochs
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=steps)
     loss_fn = torch.nn.BCEWithLogitsLoss()
@@ -123,5 +127,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true", help="1 epoch on 20 samples (pipeline test)")
     ap.add_argument("--seed", type=int, default=C.SEED, help=f"random seed (default {C.SEED})")
+    ap.add_argument("--epochs", type=int, help=f"override config.EPOCHS (default {C.EPOCHS})")
+    ap.add_argument("--batch-size", type=int, help=f"override config.BATCH_SIZE (default {C.BATCH_SIZE})")
+    ap.add_argument("--lr", type=float, help=f"override config.LR (default {C.LR:g})")
     args = ap.parse_args()
-    train(smoke=args.smoke, seed=args.seed)
+    train(smoke=args.smoke, seed=args.seed, epochs=args.epochs,
+          batch_size=args.batch_size, lr=args.lr)
