@@ -6,6 +6,7 @@ side-by-side prediction-vs-truth images for the report.
 """
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -98,23 +99,41 @@ def save_predictions(model, dataset, device, out_path, n=8, thresh=C.THRESHOLD):
     print("saved predictions ->", out_path)
 
 
-if __name__ == "__main__":
+def main(argv=None):
     from torch.utils.data import DataLoader
     from dataset import build_datasets
     from model import build_model
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    ap = argparse.ArgumentParser(description="Evaluate a checkpoint on the validation fold.")
+    ap.add_argument("--ckpt", type=Path, default=C.OUTPUTS / "best.pt",
+                    help="checkpoint to load (default outputs/best.pt)")
+    ap.add_argument("--threshold", type=float, default=C.THRESHOLD,
+                    help=f"probability threshold for the positive class (default {C.THRESHOLD})")
+    ap.add_argument("--n-preds", type=int, default=8,
+                    help="how many qualitative samples to render (0 to skip)")
+    ap.add_argument("--out", type=Path, default=C.OUTPUTS / "predictions.png",
+                    help="where to write the prediction grid")
+    args = ap.parse_args(argv)
+
+    device = C.get_device()
     _, val_ds = build_datasets()
     val_loader = DataLoader(val_ds, batch_size=C.BATCH_SIZE, num_workers=C.NUM_WORKERS)
 
     model = build_model().to(device)
-    ckpt = C.OUTPUTS / "best.pt"
-    if ckpt.exists():
-        model.load_state_dict(torch.load(ckpt, map_location=device, weights_only=False)["model"])
-        print("loaded", ckpt)
+    if args.ckpt.exists():
+        model.load_state_dict(torch.load(args.ckpt, map_location=device, weights_only=False)["model"])
+        print("loaded", args.ckpt)
     else:
-        print("WARNING: no checkpoint at", ckpt, "- evaluating random weights")
+        print("WARNING: no checkpoint at", args.ckpt, "- evaluating random weights")
 
-    m = evaluate(model, val_loader, device)
-    print("\n" + results_table(m))
-    save_predictions(model, val_ds, device, C.OUTPUTS / "predictions.png")
+    m = evaluate(model, val_loader, device, thresh=args.threshold)
+    print()
+    print(f"threshold: {args.threshold}")
+    print(results_table(m))
+    if args.n_preds > 0:
+        save_predictions(model, val_ds, device, args.out, n=args.n_preds, thresh=args.threshold)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
