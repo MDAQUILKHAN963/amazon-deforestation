@@ -35,7 +35,7 @@ def make_optimizer(model, lr=None):
     return torch.optim.AdamW(model.parameters(), lr=lr or C.LR, weight_decay=1e-4)
 
 
-def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None):
+def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None, resume=False):
     """Train the U-Net. Any of epochs/batch_size/lr left as None falls back to config."""
     set_seed(seed)
     device = C.get_device()
@@ -68,11 +68,31 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None):
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
     C.OUTPUTS.mkdir(parents=True, exist_ok=True)
+    run_config = {"ENCODER": C.ENCODER, "IN_CHANNELS": C.IN_CHANNELS,
+                  "VAL_FOLD": C.VAL_FOLD, "BATCH_SIZE": batch, "LR": lr, "SEED": seed}
     best_iou = -1.0
     history = []
+    start_epoch = 0
+    last_ckpt = C.OUTPUTS / "last.pt"
+
+    if resume:
+        if not last_ckpt.exists():
+            raise FileNotFoundError(f"--resume given but no checkpoint at {last_ckpt}")
+        state = torch.load(last_ckpt, map_location=device, weights_only=False)
+        model.load_state_dict(state["model"])
+        opt.load_state_dict(state["opt"])
+        sched.load_state_dict(state["sched"])
+        scaler.load_state_dict(state["scaler"])
+        start_epoch = state["epoch"]
+        best_iou = state["best_iou"]
+        history = state["history"]
+        print(f"resumed from {last_ckpt} at epoch {start_epoch} (best val IoU {best_iou:.3f})")
+        if start_epoch >= epochs:
+            print(f"already trained {start_epoch} epochs >= --epochs {epochs}; nothing to do")
+            return history
 
     try:
-        for epoch in range(epochs):
+        for epoch in range(start_epoch, epochs):
             model.train()
             t0 = time.time()
             run_loss = 0.0
@@ -109,11 +129,18 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None):
             if val["iou"] > best_iou:
                 best_iou = val["iou"]
                 torch.save({"model": model.state_dict(), "epoch": epoch + 1,
-                            "val": val, "config": {k: getattr(C, k) for k in
-                            ["ENCODER", "IN_CHANNELS", "VAL_FOLD", "BATCH_SIZE", "LR"]}},
+                            "val": val, "config": run_config},
                            C.OUTPUTS / "best.pt")
                 if not smoke:
                     print(f"   ✓ new best (val IoU {best_iou:.3f}) -> {C.OUTPUTS/'best.pt'}")
+
+            # full training state, rewritten every epoch, so --resume can pick up
+            # exactly where a preempted run stopped (not just the best epoch)
+            torch.save({"model": model.state_dict(), "opt": opt.state_dict(),
+                        "sched": sched.state_dict(), "scaler": scaler.state_dict(),
+                        "epoch": epoch + 1, "best_iou": best_iou,
+                        "history": history, "config": run_config},
+                       last_ckpt)
 
     except torch.cuda.OutOfMemoryError:
         print("\n❌ CUDA OUT OF MEMORY.\n"
@@ -156,6 +183,8 @@ if __name__ == "__main__":
     ap.add_argument("--epochs", type=int, help=f"override config.EPOCHS (default {C.EPOCHS})")
     ap.add_argument("--batch-size", type=int, help=f"override config.BATCH_SIZE (default {C.BATCH_SIZE})")
     ap.add_argument("--lr", type=float, help=f"override config.LR (default {C.LR:g})")
+    ap.add_argument("--resume", action="store_true",
+                    help="continue from outputs/last.pt (restores optimizer, schedule and history)")
     args = ap.parse_args()
     train(smoke=args.smoke, seed=args.seed, epochs=args.epochs,
-          batch_size=args.batch_size, lr=args.lr)
+          batch_size=args.batch_size, lr=args.lr, resume=args.resume)
