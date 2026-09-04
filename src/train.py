@@ -28,7 +28,7 @@ import config as C
 from dataset import build_datasets
 from model import build_model
 from eval import evaluate, confusion_counts, metrics_from_counts, results_table
-from utils import set_seed, seed_worker, save_history_csv
+from utils import set_seed, seed_worker, save_history_csv, save_json, utc_timestamp
 
 
 def make_optimizer(model, lr=None):
@@ -121,6 +121,27 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None):
               "   or set GRAD_ACCUM=2 to keep the effective batch size.\n"
               "   Still OOM? reduce IN_CHANNELS or IMG_SIZE.")
         raise
+
+    run_meta = {
+        "finished_utc": utc_timestamp(),
+        "device": device,
+        "seed": seed,
+        "epochs": epochs,
+        "batch_size": batch,
+        "lr": lr,
+        "smoke": smoke,
+        "encoder": C.ENCODER,
+        "in_channels": C.IN_CHANNELS,
+        "val_fold": C.VAL_FOLD,
+        "grad_accum": C.GRAD_ACCUM,
+        "amp": amp_enabled,
+        "n_train": len(train_ds),
+        "n_val": len(val_ds),
+        "epochs_completed": len(history),
+        "best_val_iou": best_iou,
+        "best_epoch": max(history, key=lambda h: h["val_iou"])["epoch"] if history else None,
+    }
+    save_json(run_meta, C.OUTPUTS / "run.json")
 
     print(f"\nbest val IoU: {best_iou:.3f}")
     if not smoke:
