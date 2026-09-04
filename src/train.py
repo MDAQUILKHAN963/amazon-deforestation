@@ -35,7 +35,8 @@ def make_optimizer(model, lr=None):
     return torch.optim.AdamW(model.parameters(), lr=lr or C.LR, weight_decay=1e-4)
 
 
-def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None, resume=False):
+def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None,
+          resume=False, patience=None):
     """Train the U-Net. Any of epochs/batch_size/lr left as None falls back to config."""
     set_seed(seed)
     device = C.get_device()
@@ -45,7 +46,9 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None, resum
     epochs = epochs or C.EPOCHS
     batch = batch_size or C.BATCH_SIZE
     lr = lr or C.LR
-    print(f"epochs: {epochs} | batch: {batch} | lr: {lr:g}")
+    patience = C.PATIENCE if patience is None else patience
+    print(f"epochs: {epochs} | batch: {batch} | lr: {lr:g}"
+          + (f" | patience: {patience}" if patience else ""))
 
     if smoke:                                   # CHECKPOINT 4: tiny, fast sanity run
         epochs = 1
@@ -73,6 +76,7 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None, resum
     best_iou = -1.0
     history = []
     start_epoch = 0
+    stale = 0                       # epochs since the last real val-IoU improvement
     last_ckpt = C.OUTPUTS / "last.pt"
 
     if resume:
@@ -126,6 +130,9 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None, resum
             # Colab session still leaves the epochs that did finish on disk
             save_history_csv(history, C.OUTPUTS / "history.csv")
 
+            improved = val["iou"] > best_iou + C.MIN_DELTA
+            stale = 0 if improved else stale + 1
+
             if val["iou"] > best_iou:
                 best_iou = val["iou"]
                 torch.save({"model": model.state_dict(), "epoch": epoch + 1,
@@ -141,6 +148,11 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None, resum
                         "epoch": epoch + 1, "best_iou": best_iou,
                         "history": history, "config": run_config},
                        last_ckpt)
+
+            if patience and stale >= patience:
+                print(f"   early stop: no val-IoU gain > {C.MIN_DELTA:g} for "
+                      f"{stale} epochs (patience {patience})")
+                break
 
     except torch.cuda.OutOfMemoryError:
         print("\n❌ CUDA OUT OF MEMORY.\n"
@@ -165,6 +177,8 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None, resum
         "n_train": len(train_ds),
         "n_val": len(val_ds),
         "epochs_completed": len(history),
+        "patience": patience,
+        "early_stopped": bool(patience) and len(history) < epochs,
         "best_val_iou": best_iou,
         "best_epoch": max(history, key=lambda h: h["val_iou"])["epoch"] if history else None,
     }
@@ -185,6 +199,9 @@ if __name__ == "__main__":
     ap.add_argument("--lr", type=float, help=f"override config.LR (default {C.LR:g})")
     ap.add_argument("--resume", action="store_true",
                     help="continue from outputs/last.pt (restores optimizer, schedule and history)")
+    ap.add_argument("--patience", type=int,
+                    help=f"stop after N epochs without val-IoU gain (default {C.PATIENCE}, 0 = off)")
     args = ap.parse_args()
     train(smoke=args.smoke, seed=args.seed, epochs=args.epochs,
-          batch_size=args.batch_size, lr=args.lr, resume=args.resume)
+          batch_size=args.batch_size, lr=args.lr, resume=args.resume,
+          patience=args.patience)

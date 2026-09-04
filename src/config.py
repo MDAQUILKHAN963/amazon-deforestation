@@ -57,6 +57,8 @@ USE_AMP       = _env_bool("USE_AMP", True)    # mixed precision — big memory s
 GRAD_ACCUM    = _env_int("GRAD_ACCUM", 1)     # raise to simulate a larger batch if memory-tight
 INPUT_DROPOUT = 0.5               # max fraction of dates/bands randomly zeroed in training
 NUM_WORKERS   = _env_int("NUM_WORKERS", 2)
+PATIENCE      = _env_int("PATIENCE", 0)       # epochs without val-IoU gain before stopping; 0 = never
+MIN_DELTA     = _env_float("MIN_DELTA", 1e-4) # IoU gain below this does not count as improvement
 
 # --- data / split --------------------------------------------------------
 IMG_SIZE      = 256
