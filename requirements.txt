@@ -1,16 +1,26 @@
-# Core DL stack (Colab ships torch/torchvision; pin loosely for local installs)
-torch
-torchvision
-segmentation-models-pytorch
+# Core DL stack.
+# Colab already ships torch/torchvision — install with --no-deps there, or just
+# `pip install segmentation-models-pytorch`, to avoid pulling a second CUDA build.
+# Lower bounds only: torch.amp.GradScaler("cuda", ...) needs torch>=2.3.
+torch>=2.3
+torchvision>=0.18
+segmentation-models-pytorch>=0.3.3
 
-# Geospatial I/O
-rioxarray
-xarray
-netCDF4
+# Geospatial I/O (NetCDF tiles from MultiEarth, GeoTIFF from GEE/Hansen)
+rioxarray>=0.15
+xarray>=2023.6
+netCDF4>=1.6
 
 # Data / augmentation / metrics / utils
-numpy
-albumentations
-scikit-learn
-matplotlib
-tqdm
+numpy>=1.24,<3
+albumentations>=1.4
+scikit-learn>=1.3
+matplotlib>=3.7
+tqdm>=4.65
+
+# Interactive demos (src/app.py, src/app_unified.py) and GEE/Hansen tile fetches
+gradio>=4.0
+requests>=2.31
+
+# Tests
+pytest>=8.0
