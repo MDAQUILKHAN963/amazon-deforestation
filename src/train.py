@@ -28,7 +28,7 @@ import config as C
 from dataset import build_datasets
 from model import build_model
 from eval import evaluate, confusion_counts, metrics_from_counts, results_table
-from utils import set_seed, seed_worker
+from utils import set_seed, seed_worker, save_history_csv
 
 
 def make_optimizer(model, lr=None):
@@ -99,7 +99,12 @@ def train(smoke=False, seed=C.SEED, epochs=None, batch_size=None, lr=None):
                   f"IoU {tr['iou']:.3f} | val IoU {val['iou']:.3f} "
                   f"F1 {val['f1']:.3f} acc {val['pixel_acc']*100:.1f}% | lr {sched.get_last_lr()[0]:.2e}")
             history.append({"epoch": epoch + 1, "train_loss": run_loss/max(1,len(train_loader)),
+                            "train_iou": tr["iou"], "lr": sched.get_last_lr()[0],
+                            "epoch_seconds": round(dt, 2),
                             **{f"val_{k}": v for k, v in val.items()}})
+            # rewrite every epoch, not just at the end, so an OOM or a dropped
+            # Colab session still leaves the epochs that did finish on disk
+            save_history_csv(history, C.OUTPUTS / "history.csv")
 
             if val["iou"] > best_iou:
                 best_iou = val["iou"]
